@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { encodeBase64ToJson, encodeJsonToBase64 } from './base64.js';
 import { MintKeys, Proof, Token, TokenEntry, TokenV2 } from './model/types/index.js';
 import { TOKEN_PREFIX, TOKEN_VERSION } from './utils/Constants.js';
@@ -132,7 +133,7 @@ export function checkResponse(data: { error?: string; detail?: string }) {
 	}
 }
 export function checkResponseError(err: unknown) {
-	if (err?.response?.data) {
+	if (axios.isAxiosError(err) && err?.response?.data) {
 		if ('error' in err.response.data) {
 			throw new Error(err.response.data.error);
 		}

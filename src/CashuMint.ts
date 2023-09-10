@@ -1,3 +1,4 @@
+import { axios } from './axios.js';
 import {
 	ApiError,
 	CheckSpendablePayload,
@@ -31,8 +32,7 @@ class CashuMint {
 	 * @param mintUrl
 	 */
 	public static async getInfo(mintUrl: string): Promise<GetInfoResponse> {
-		const res = await fetch(`${mintUrl}/info`);
-		const data: GetInfoResponse = await res.json()
+		const { data } = await axios.get<GetInfoResponse>(`${mintUrl}/info`);
 		return data;
 	}
 	/**
@@ -48,8 +48,9 @@ class CashuMint {
 	 * @returns the mint will create and return a Lightning invoice for the specified amount
 	 */
 	public static async requestMint(mintUrl: string, amount: number): Promise<RequestMintResponse> {
-		const res = await fetch(`${mintUrl}/mint?amount=${amount}`);
-		const data = await res.json()
+		const { data } = await axios.get<RequestMintResponse>(`${mintUrl}/mint`, {
+			params: { amount }
+		});
 		return data;
 	}
 
@@ -74,10 +75,17 @@ class CashuMint {
 		hash: string
 	) {
 		try {
-			const res = await fetch(`${mintUrl}/mint?hash=${hash}`, {method: 'POST', body: JSON.stringify(payloads)})
-			const data: { promises: Array<SerializedBlindedSignature> } 
-			& ApiError = await res.json()
-			
+			const { data } = await axios.post<{ promises: Array<SerializedBlindedSignature> } & ApiError>(
+				`${mintUrl}/mint`,
+				payloads,
+				{
+					params: {
+						// payment_hash is deprecated
+						payment_hash: hash,
+						hash
+					}
+				}
+			);
 			checkResponse(data);
 			if (!isObj(data) || !Array.isArray(data?.promises)) {
 				throw new Error('bad response');
@@ -108,8 +116,7 @@ class CashuMint {
 			// make the keysetId url safe
 			keysetId = keysetId.replace(/\//g, '_').replace(/\+/g, '-');
 		}
-		const res = await fetch(`${mintUrl}/keys${keysetId ? `/${keysetId}` : ''}`)
-		const data = await res.json()
+		const { data } = await axios.get<MintKeys>(`${mintUrl}/keys${keysetId ? `/${keysetId}` : ''}`);
 		return data;
 	}
 	/**
@@ -126,8 +133,7 @@ class CashuMint {
 	 * @returns all the mints past and current keysets.
 	 */
 	public static async getKeySets(mintUrl: string): Promise<{ keysets: Array<string> }> {
-		const res = await fetch(`${mintUrl}/keysets`)
-		const data = await res.json()
+		const { data } = await axios.get<{ keysets: Array<string> }>(`${mintUrl}/keysets`);
 		return data;
 	}
 
@@ -147,8 +153,7 @@ class CashuMint {
 	 */
 	public static async split(mintUrl: string, splitPayload: SplitPayload): Promise<SplitResponse> {
 		try {
-			const res = await fetch(`${mintUrl}/split`, {method: 'POST', body: JSON.stringify(splitPayload)})
-			const data: SplitResponse = await res.json()
+			const { data } = await axios.post<SplitResponse>(`${mintUrl}/split`, splitPayload);
 			checkResponse(data);
 			if (!isObj(data) || !Array.isArray(data?.fst) || !Array.isArray(data?.snd)) {
 				throw new Error('bad response');
@@ -175,8 +180,7 @@ class CashuMint {
 	 */
 	public static async melt(mintUrl: string, meltPayload: MeltPayload): Promise<MeltResponse> {
 		try {
-			const res = await fetch(`${mintUrl}/melt`, {method: 'POST', body: JSON.stringify(meltPayload)})
-			const data: MeltResponse = await res.json()
+			const { data } = await axios.post<MeltResponse>(`${mintUrl}/melt`, meltPayload);
 			checkResponse(data);
 			if (
 				!isObj(data) ||
@@ -210,9 +214,10 @@ class CashuMint {
 		checkfeesPayload: { pr: string }
 	): Promise<{ fee: number }> {
 		try {
-			const res = await fetch(`${mintUrl}/checkfees`, {method: 'POST', body: JSON.stringify(checkfeesPayload)})
-			const data: { fee: number } & ApiError = await res.json()
-			
+			const { data } = await axios.post<{ fee: number } & ApiError>(
+				`${mintUrl}/checkfees`,
+				checkfeesPayload
+			);
 			checkResponse(data);
 			if (!isObj(data) || typeof data?.fee !== 'number') {
 				throw new Error('bad response');
@@ -243,9 +248,7 @@ class CashuMint {
 		checkPayload: CheckSpendablePayload
 	): Promise<CheckSpendableResponse> {
 		try {
-			const res = await fetch(`${mintUrl}/check`, {method: 'POST', body: JSON.stringify(checkPayload)})
-			const data: CheckSpendableResponse = await res.json()
-
+			const { data } = await axios.post<CheckSpendableResponse>(`${mintUrl}/check`, checkPayload);
 			checkResponse(data);
 			if (!isObj(data) || !Array.isArray(data?.spendable)) {
 				throw new Error('bad response');
