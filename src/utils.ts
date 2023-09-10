@@ -131,6 +131,16 @@ export function checkResponse(data: { error?: string; detail?: string }) {
 		throw new Error(data.detail);
 	}
 }
+export function checkResponseError(err: unknown) {
+	if (err?.response?.data) {
+		if ('error' in err.response.data) {
+			throw new Error(err.response.data.error);
+		}
+		if ('detail' in err.response.data) {
+			throw new Error(err.response.data.detail);
+		}
+	}
+}
 export {
 	hexToNumber,
 	splitAmount,

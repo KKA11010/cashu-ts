@@ -1,4 +1,5 @@
 import {
+	ApiError,
 	CheckSpendablePayload,
 	CheckSpendableResponse,
 	GetInfoResponse,
@@ -11,8 +12,7 @@ import {
 	SplitPayload,
 	SplitResponse
 } from './model/types/index.js';
-import request from './request.js';
-import { isObj } from './utils.js';
+import { checkResponse, checkResponseError, isObj } from './utils.js';
 
 /**
  * Class represents Cashu Mint API. This class contains Lower level functions that are implemented by CashuWallet.
@@ -31,7 +31,9 @@ class CashuMint {
 	 * @param mintUrl
 	 */
 	public static async getInfo(mintUrl: string): Promise<GetInfoResponse> {
-		return request<GetInfoResponse>({ endpoint: `${mintUrl}/info` });
+		const res = await fetch(`${mintUrl}/info`);
+		const data: GetInfoResponse = await res.json()
+		return data;
 	}
 	/**
 	 * fetches mints info at the /info endpoint
@@ -46,7 +48,9 @@ class CashuMint {
 	 * @returns the mint will create and return a Lightning invoice for the specified amount
 	 */
 	public static async requestMint(mintUrl: string, amount: number): Promise<RequestMintResponse> {
-		return request<RequestMintResponse>({ endpoint: `${mintUrl}/mint?amount=${amount}` });
+		const res = await fetch(`${mintUrl}/mint?amount=${amount}`);
+		const data = await res.json()
+		return data;
 	}
 
 	/**
@@ -69,17 +73,20 @@ class CashuMint {
 		payloads: { outputs: Array<SerializedBlindedMessage> },
 		hash: string
 	) {
-		const data = await request<{ promises: Array<SerializedBlindedSignature> }>({
-			endpoint: `${mintUrl}/mint?hash=${hash}`,
-			method: 'POST',
-			requestBody: payloads
-		});
-
-		if (!isObj(data) || !Array.isArray(data?.promises)) {
-			throw new Error('bad response');
+		try {
+			const res = await fetch(`${mintUrl}/mint?hash=${hash}`, {method: 'POST', body: JSON.stringify(payloads)})
+			const data: { promises: Array<SerializedBlindedSignature> } 
+			& ApiError = await res.json()
+			
+			checkResponse(data);
+			if (!isObj(data) || !Array.isArray(data?.promises)) {
+				throw new Error('bad response');
+			}
+			return data;
+		} catch (err) {
+			checkResponseError(err);
+			throw err;
 		}
-
-		return data;
 	}
 	/**
 	 * Requests the mint to perform token minting after the LN invoice has been paid
@@ -101,9 +108,9 @@ class CashuMint {
 			// make the keysetId url safe
 			keysetId = keysetId.replace(/\//g, '_').replace(/\+/g, '-');
 		}
-		return request<MintKeys>({
-			endpoint: `${mintUrl}/keys${keysetId ? `/${keysetId}` : ''}`
-		});
+		const res = await fetch(`${mintUrl}/keys${keysetId ? `/${keysetId}` : ''}`)
+		const data = await res.json()
+		return data;
 	}
 	/**
 	 * Get the mints public keys
@@ -119,7 +126,9 @@ class CashuMint {
 	 * @returns all the mints past and current keysets.
 	 */
 	public static async getKeySets(mintUrl: string): Promise<{ keysets: Array<string> }> {
-		return request<{ keysets: Array<string> }>({ endpoint: `${mintUrl}/keysets` });
+		const res = await fetch(`${mintUrl}/keysets`)
+		const data = await res.json()
+		return data;
 	}
 
 	/**
@@ -137,17 +146,18 @@ class CashuMint {
 	 * @returns split tokens
 	 */
 	public static async split(mintUrl: string, splitPayload: SplitPayload): Promise<SplitResponse> {
-		const data = await request<SplitResponse>({
-			endpoint: `${mintUrl}/split`,
-			method: 'POST',
-			requestBody: splitPayload
-		});
-
-		if (!isObj(data) || !Array.isArray(data?.fst) || !Array.isArray(data?.snd)) {
-			throw new Error('bad response');
+		try {
+			const res = await fetch(`${mintUrl}/split`, {method: 'POST', body: JSON.stringify(splitPayload)})
+			const data: SplitResponse = await res.json()
+			checkResponse(data);
+			if (!isObj(data) || !Array.isArray(data?.fst) || !Array.isArray(data?.snd)) {
+				throw new Error('bad response');
+			}
+			return data;
+		} catch (err) {
+			checkResponseError(err);
+			throw err;
 		}
-
-		return data;
 	}
 	/**
 	 * Ask mint to perform a split operation
@@ -164,21 +174,22 @@ class CashuMint {
 	 * @returns
 	 */
 	public static async melt(mintUrl: string, meltPayload: MeltPayload): Promise<MeltResponse> {
-		const data = await request<MeltResponse>({
-			endpoint: `${mintUrl}/melt`,
-			method: 'POST',
-			requestBody: meltPayload
-		});
-
-		if (
-			!isObj(data) ||
-			typeof data?.paid !== 'boolean' ||
-			(data?.preimage !== null && typeof data?.preimage !== 'string')
-		) {
-			throw new Error('bad response');
+		try {
+			const res = await fetch(`${mintUrl}/melt`, {method: 'POST', body: JSON.stringify(meltPayload)})
+			const data: MeltResponse = await res.json()
+			checkResponse(data);
+			if (
+				!isObj(data) ||
+				typeof data?.paid !== 'boolean' ||
+				(data?.preimage !== null && typeof data?.preimage !== 'string')
+			) {
+				throw new Error('bad response');
+			}
+			return data;
+		} catch (err) {
+			checkResponseError(err);
+			throw err;
 		}
-
-		return data;
 	}
 	/**
 	 * Ask mint to perform a melt operation. This pays a lightning invoice and destroys tokens matching its amount + fees
@@ -198,17 +209,19 @@ class CashuMint {
 		mintUrl: string,
 		checkfeesPayload: { pr: string }
 	): Promise<{ fee: number }> {
-		const data = await request<{ fee: number }>({
-			endpoint: `${mintUrl}/checkfees`,
-			method: 'POST',
-			requestBody: checkfeesPayload
-		});
-
-		if (!isObj(data) || typeof data?.fee !== 'number') {
-			throw new Error('bad response');
+		try {
+			const res = await fetch(`${mintUrl}/checkfees`, {method: 'POST', body: JSON.stringify(checkfeesPayload)})
+			const data: { fee: number } & ApiError = await res.json()
+			
+			checkResponse(data);
+			if (!isObj(data) || typeof data?.fee !== 'number') {
+				throw new Error('bad response');
+			}
+			return data;
+		} catch (err) {
+			checkResponseError(err);
+			throw err;
 		}
-
-		return data;
 	}
 	/**
 	 * Estimate fees for a given LN invoice
@@ -229,17 +242,19 @@ class CashuMint {
 		mintUrl: string,
 		checkPayload: CheckSpendablePayload
 	): Promise<CheckSpendableResponse> {
-		const data = await request<CheckSpendableResponse>({
-			endpoint: `${mintUrl}/check`,
-			method: 'POST',
-			requestBody: checkPayload
-		});
+		try {
+			const res = await fetch(`${mintUrl}/check`, {method: 'POST', body: JSON.stringify(checkPayload)})
+			const data: CheckSpendableResponse = await res.json()
 
-		if (!isObj(data) || !Array.isArray(data?.spendable)) {
-			throw new Error('bad response');
+			checkResponse(data);
+			if (!isObj(data) || !Array.isArray(data?.spendable)) {
+				throw new Error('bad response');
+			}
+			return data;
+		} catch (err) {
+			checkResponseError(err);
+			throw err;
 		}
-
-		return data;
 	}
 	/**
 	 * Checks if specific proofs have already been redeemed
