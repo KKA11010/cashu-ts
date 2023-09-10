@@ -3,10 +3,9 @@ import { checkResponse } from './utils';
 type RequestArgs = {
 	endpoint: string;
 	requestBody?: Record<string, unknown>;
-	headers?: Record<string, string>;
 };
 
-type RequestOptions = RequestArgs & Omit<RequestInit, 'body' | 'headers'>;
+type RequestOptions = RequestArgs & Omit<RequestInit, 'body'>;
 
 let globalRequestOptions: Partial<RequestOptions> = {};
 
@@ -18,20 +17,9 @@ export function setGlobalRequestOptions(options: Partial<RequestOptions>): void 
 	globalRequestOptions = options;
 }
 
-async function _request({
-	endpoint,
-	requestBody,
-	headers: requestHeaders,
-	...options
-}: RequestOptions): Promise<Response> {
+async function _request({ endpoint, requestBody, ...options }: RequestOptions): Promise<Response> {
 	const body = requestBody ? JSON.stringify(requestBody) : undefined;
-	const headers = {
-		...{ Accept: 'application/json, text/plain, */*' },
-		...(body ? { 'Content-Type': 'application/json' } : undefined),
-		...requestHeaders
-	};
-
-	const response = await fetch(endpoint, { body, headers, ...options });
+	const response = await fetch(endpoint, { body, ...options });
 
 	if (!response.ok) {
 		const { error, detail } = await response.json();
@@ -43,6 +31,8 @@ async function _request({
 }
 
 export default async function request<T>(options: RequestOptions): Promise<T> {
+	options.headers = { 'Content-Type': 'application/json', ...options.headers };
+	options.headers = { 'Accept': 'application/json', ...options.headers };
 	const response = await _request({ ...options, ...globalRequestOptions });
 	const data = await response.json().catch(() => ({ error: 'bad response' }));
 	checkResponse(data);
